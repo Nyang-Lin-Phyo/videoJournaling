@@ -187,7 +187,7 @@ def get_journal_video(journal_id: str):
 @router.post(
     "/{journal_id}/complete",
     status_code=202,
-    operation_id="completeJournal",
+    operation_id="completeJournalUpload",
 )
 def complete_journal_endpoint(
     journal_id: str,
