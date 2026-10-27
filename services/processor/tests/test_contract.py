@@ -61,3 +61,54 @@ def test_schema_rejects_invalid_sentiment() -> None:
     }
 
     assert not analysis_validator.is_valid(invalid)
+
+
+def test_gemini_request_schema_stays_in_sync_with_contract() -> None:
+    """_ANALYSIS_JSON_SCHEMA must mirror analysis.schema.json.
+
+    Allowed, documented differences only:
+      * snake_case ``additional_properties`` (google-genai Schema style)
+        vs the contract's camelCase ``additionalProperties``
+      * descriptive keys (title/description/$schema) are not sent
+      * ``uniqueItems`` — google-genai Schema cannot express it; duplicate
+        elements are enforced locally by the Pydantic model instead
+        (see test_analysis_model_rejects_duplicate_emotions).
+    """
+    from services.processor.analysis import _ANALYSIS_JSON_SCHEMA as gemini_schema
+
+    def strip_keys(obj: object, keys: tuple[str, ...]) -> object:
+        if isinstance(obj, dict):
+            return {
+                k: strip_keys(v, keys)
+                for k, v in obj.items()
+                if k not in keys
+            }
+        if isinstance(obj, list):
+            return [strip_keys(item, keys) for item in obj]
+        return obj
+
+    contract = dict(analysis_schema)
+    contract_props = contract.pop("properties")
+    gemini = dict(gemini_schema)
+    gemini_props = gemini.pop("properties")
+
+    contract_additional = contract.pop("additionalProperties", None)
+    gemini_additional = gemini.pop("additional_properties", None)
+    assert contract_additional == gemini_additional
+
+    ignored = ("title", "description", "$schema", "uniqueItems")
+    contract = strip_keys(contract, ignored)  # type: ignore[assignment]
+    gemini = strip_keys(gemini, ignored)  # type: ignore[assignment]
+    contract_props = strip_keys(contract_props, ignored)  # type: ignore[assignment]
+    gemini_props = strip_keys(gemini_props, ignored)  # type: ignore[assignment]
+
+    assert gemini == contract
+    assert gemini_props == contract_props
+
+    # uniqueItems dropped from the request schema — assert it existed in the
+    # contract so this stays a conscious, documented gap.
+    assert any(
+        item.get("uniqueItems") is True
+        for item in analysis_schema["properties"].values()
+        if isinstance(item, dict)
+    )
