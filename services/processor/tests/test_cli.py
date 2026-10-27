@@ -62,11 +62,18 @@ def test_cli_missing_file_exits_nonzero(tmp_path: Path) -> None:
     assert completed.stdout.strip() == ""
 
 
-def test_cli_not_implemented_mode_fails_loudly(mp4_path: Path) -> None:
-    completed = run_cli(str(mp4_path), env_extra={"TRANSCRIPTION_MODE": "faster_whisper"})
+def test_cli_real_transcription_mode_fails_safely_on_bad_input() -> None:
+    """Real mode + invalid file fails before any model load (offline-safe)."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fake = Path(tmp) / "fake.mp4"
+        fake.write_bytes(b"not a real mp4")
+        completed = run_cli(str(fake), env_extra={"TRANSCRIPTION_MODE": "faster_whisper"})
 
     assert completed.returncode == 1
-    assert "P2" in completed.stderr
+    assert "does not look like an MP4" in completed.stderr
+    assert completed.stdout.strip() == ""
 
 
 def test_cli_invalid_mode_fails_loudly(mp4_path: Path) -> None:

@@ -7,7 +7,10 @@ from typing import Callable
 
 import pytest
 
-from services.processor.errors import InvalidVideoError, TranscriptionError
+from services.processor.errors import (
+    EmptyTranscriptError,
+    InvalidVideoError,
+)
 from services.processor.transcription import MOCK_TRANSCRIPT, transcribe_video
 
 
@@ -35,10 +38,28 @@ def test_non_mp4_content_raises(tmp_path: Path) -> None:
         transcribe_video(fake)
 
 
-def test_faster_whisper_mode_fails_loudly(
-    mp4_path: Path, env: Callable[..., None]
+def test_faster_whisper_mode_routes_to_model_loader(
+    mp4_path: Path, env: Callable[..., None], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    env(TRANSCRIPTION_MODE="faster_whisper")
+    """Real mode must load the Whisper model (stubbed here: no download)."""
+    from services.processor import transcription as transcription_module
 
-    with pytest.raises(TranscriptionError, match="P2"):
-        transcribe_video(mp4_path)
+    env(TRANSCRIPTION_MODE="faster_whisper")
+    loaded: list[str] = []
+
+    class _FakeModel:
+        def transcribe(self, _path: str):
+            loaded.append("transcribe")
+            return iter([]), object()
+
+    monkeypatch.setattr(
+        transcription_module,
+        "_load_whisper_model",
+        lambda name: loaded.append(name) or _FakeModel(),
+    )
+
+    with pytest.raises(EmptyTranscriptError):
+        transcribe_video(mp4_path)  # fake yields no segments -> typed error
+
+    assert loaded[0] == "tiny.en"  # default model name
+    assert "transcribe" in loaded

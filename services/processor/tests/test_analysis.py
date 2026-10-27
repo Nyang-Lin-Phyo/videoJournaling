@@ -78,10 +78,12 @@ def test_overlong_transcript_rejected(
         analyze_transcript("this transcript is definitely longer than ten chars")
 
 
-def test_gemini_mode_fails_loudly(env: Callable[..., None]) -> None:
-    env(ANALYSIS_MODE="gemini")
+def test_gemini_mode_without_api_key_fails_loudly(
+    env: Callable[..., None],
+) -> None:
+    env(ANALYSIS_MODE="gemini")  # env fixture deletes GEMINI_API_KEY
 
-    with pytest.raises(AnalysisError, match="P3"):
+    with pytest.raises(AnalysisError, match="GEMINI_API_KEY"):
         analyze_transcript("A perfectly normal sentence about my day.")
 
 
