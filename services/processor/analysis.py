@@ -196,7 +196,6 @@ _ANALYSIS_JSON_SCHEMA = {
         "summary": {"type": "string"},
     },
     "required": ["sentiment", "emotions", "themes", "summary"],
-    "additional_properties": False,
 }
 
 # Request timeout in milliseconds (google-genai HttpOptions unit).
